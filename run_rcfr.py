@@ -20,7 +20,6 @@ def train_fn(model, dataset):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-    # no need to return anything—RCFR just updates its internal weights for you.
 
 for i in range(1000):
     solver.evaluate_and_update_policy(train_fn)
@@ -29,4 +28,3 @@ for i in range(1000):
         nash_conv = exploitability.nash_conv(game, avg_policy)  # :contentReference[oaicite:0]{index=0}
         print(nash_conv)
 
-# finally, you can also save or inspect solver.average_policy() as you like
