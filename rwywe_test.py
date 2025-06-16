@@ -7,7 +7,7 @@ from open_spiel.python.algorithms import random_agent, maxn
 # game = pyspiel.load_game("kuhn_poker")       # or "kuhn_poker", "go(9)", etc.
 
 def random_eval(state, player):
-    return 0.0
+    return 0.
 
 # values, best_action = maxn.maxn_search(
 #     game,

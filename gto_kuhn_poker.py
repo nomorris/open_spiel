@@ -15,6 +15,7 @@ class GTOKuhnPoker(rl_agent.AbstractAgent):
         card = int(iss[0])
         r = np.random.random()
         turn = len(iss)
+        # print(turn, iss, card)
         if self.player_id == 1:
             if card==2: return 1
             if card==1:
@@ -24,7 +25,7 @@ class GTOKuhnPoker(rl_agent.AbstractAgent):
                 if iss[1]=='b': return 0
                 else: return int(r<1/3)
         else:
-            alpha = np.random.random() / 3
+            alpha = 0 # np.random.random() / 3
             r = np.random.random()
             if card==0:
                 if turn==3: return 0
