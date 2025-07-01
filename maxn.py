@@ -1,6 +1,17 @@
 import pyspiel
 
-def _maxn(state, depth, value_function=None,  best_action_holder=None):
+
+def std_value_function(state, p, c=100):
+    returns = 0 
+    for _ in range(c):
+        clone = state.clone()
+        while not clone.is_terminal():
+            la = clone.legal_actions()
+            clone.apply_action(la[np.random.randint(len(la))])
+        returns += clone.returns()[p]
+    return returns / c
+
+def _maxn(state, depth, value_function=std_value_function,  best_action_holder=None):
     num_players = state.num_players()
 
     # Terminal node: return returns for all players

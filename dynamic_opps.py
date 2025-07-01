@@ -5,8 +5,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 class OPPSBot(pyspiel.Bot):
-
-    def std_value_function(state, p, c=100):
+    def std_value_function(state, p, c=25):
         returns = 0 
         for _ in range(c):
             clone = state.clone()
@@ -16,7 +15,8 @@ class OPPSBot(pyspiel.Bot):
             returns += clone.returns()[p]
         return returns / c
 
-    def __init__(self, game, player_id, depth=10, n1=1, l1=1000000000, l2=1,
+
+    def __init__(self, game, player_id, depth=10, n1=1, l1=1000000000, l2=1, c=25,
                  value_function=std_value_function,
                  move_ordering_fn=None):
         super().__init__()
@@ -26,6 +26,7 @@ class OPPSBot(pyspiel.Bot):
         self.n1 = n1
         self.l1 = l1
         self.l2 = l2
+        self.c = c
         self.value_function = value_function
         self.move_ordering_fn = move_ordering_fn
 
@@ -41,9 +42,10 @@ class OPPSBot(pyspiel.Bot):
             for a in legal:
                 child = state.clone()
                 child.apply_action(a)
-                h = self.value_function(child, self.player_id)
+                h = self.value_function(child, self.player_id, self.c)
+                print(h)
                 vals.append((a, h))
-            vals_sorted = sorted(vals, key=lambda x: x[1])
+            vals_sorted = sorted(vals, key=lambda x: -x[1])
             ordered = [a for (a, _) in vals_sorted]
             return ordered
 
@@ -52,7 +54,7 @@ class OPPSBot(pyspiel.Bot):
             returns = state.returns() 
             return returns[self.player_id]
         if depth <= 0:
-            return self.value_function(state, self.player_id)
+            return self.value_function(state, self.player_id, self.c)
 
         current = state.current_player()
         ordered = self._static_move_order(state)
@@ -61,10 +63,11 @@ class OPPSBot(pyspiel.Bot):
             m_count = 0
             A_prime = ordered 
         else:
+            mx = max(A_prime, key=lambda x,y: y)
             if m_count >= self.n1:
-                A_prime = ordered[:self.l2]
+                A_prime = list(filter(lambda x,y: y>3*mx/5, ordered))
             else:
-                A_prime = ordered[:self.l1]
+                A_prime = list(filter(lambda x,y: y>3*mx/4, ordered))
         if not A_prime:
             returns = state.returns()
             return returns[self.player_id]
@@ -102,6 +105,10 @@ class OPPSBot(pyspiel.Bot):
                 if r < cum:
                     return action
             return outcomes[-1][0]
+        
+        self.n1 = 1
+        self.l1 = np.ceil(np.log(len(state.legal_actions())))
+        self.l2 = np.ceil(self.l1 * (5**0.5 - 1) / 2)
 
         legal = state.legal_actions()
         best_action = None

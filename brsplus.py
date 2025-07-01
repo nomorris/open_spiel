@@ -6,7 +6,18 @@ import warnings
 warnings.filterwarnings("ignore")
 
 class BRSPlus(pyspiel.Bot):
-    def __init__(self, game, player_id, depth=3, value_function=None):
+
+    def std_value_function(state, p, c=25):
+        returns = 0 
+        for _ in range(c):
+            clone = state.clone()
+            while not clone.is_terminal():
+                la = clone.legal_actions()
+                clone.apply_action(la[np.random.randint(len(la))])
+            returns += clone.returns()[p]
+        return returns / c
+
+    def __init__(self, game, player_id, depth=2, value_function=std_value_function):
         super().__init__()
         self.game = game
         self.player_id = player_id

@@ -5,8 +5,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 class OPPSBot(pyspiel.Bot):
-
-    def std_value_function(state, p, c=100):
+    def std_value_function(state, p, c=25):
         returns = 0 
         for _ in range(c):
             clone = state.clone()
@@ -15,6 +14,7 @@ class OPPSBot(pyspiel.Bot):
                 clone.apply_action(la[np.random.randint(len(la))])
             returns += clone.returns()[p]
         return returns / c
+
 
     def __init__(self, game, player_id, depth=10, n1=1, l1=1000000000, l2=1,
                  value_function=std_value_function,
@@ -42,6 +42,7 @@ class OPPSBot(pyspiel.Bot):
                 child = state.clone()
                 child.apply_action(a)
                 h = self.value_function(child, self.player_id)
+                print(h)
                 vals.append((a, h))
             vals_sorted = sorted(vals, key=lambda x: x[1])
             ordered = [a for (a, _) in vals_sorted]
@@ -102,6 +103,8 @@ class OPPSBot(pyspiel.Bot):
                 if r < cum:
                     return action
             return outcomes[-1][0]
+        
+        # self.n1 = np.ceil(np.log(self.game.num_players()))
 
         legal = state.legal_actions()
         best_action = None

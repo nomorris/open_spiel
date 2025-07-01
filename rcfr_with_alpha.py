@@ -70,7 +70,7 @@ def tensor_to_matrix(tensor):
 
 
 def with_one_hot_action_features(state_features, legal_actions,
-                                 num_distinct_actions):
+                                 num_distinct_actions, alpha):
   """Constructs features for each sequence by extending state features.
 
   Sequences features are constructed by concatenating one-hot features
@@ -97,12 +97,12 @@ def with_one_hot_action_features(state_features, legal_actions,
   for action in legal_actions:
     action_features = F.one_hot(
         torch.tensor([action]), num_classes=num_distinct_actions)
-    all_features = torch.cat([state_features, action_features], axis=1)
+    all_features = torch.cat([state_features, action_features, torch.tensor([[alpha]])], axis=1)
     with_action_features.append(all_features)
   return torch.cat(with_action_features, axis=0)
 
 
-def sequence_features(state, num_distinct_actions):
+def sequence_features(state, num_distinct_actions, alpha):
   """The sequence features at `state`.
 
   Features are constructed by concatenating `state`'s normalized feature
@@ -119,7 +119,7 @@ def sequence_features(state, num_distinct_actions):
   """
   return with_one_hot_action_features(state.information_state_tensor(),
                                       state.legal_actions(),
-                                      num_distinct_actions)
+                                      num_distinct_actions, alpha)
 
 
 def num_features(game):
@@ -128,7 +128,7 @@ def num_features(game):
   Args:
     game: An OpenSpiel `Game`.
   """
-  return game.information_state_tensor_size() + game.num_distinct_actions()
+  return game.information_state_tensor_size() + game.num_distinct_actions() + 1
 
 
 class RootStateWrapper(object):
@@ -156,8 +156,9 @@ class RootStateWrapper(object):
       each player.
   """
 
-  def __init__(self, state):
+  def __init__(self, state, alpha):
     self.root = state
+    self.alpha = alpha
     self._num_distinct_actions = len(state.legal_actions_mask(0))
 
     self.sequence_features = [[] for _ in range(state.num_players())]
@@ -188,7 +189,7 @@ class RootStateWrapper(object):
       n = self.num_player_sequences[player]
       self.info_state_to_sequence_idx[info_state] = n
       self.sequence_features[player].append(
-          sequence_features(state, self._num_distinct_actions))
+          sequence_features(state, self._num_distinct_actions, self.alpha))
       self.num_player_sequences[player] += len(actions)
 
     for action in actions:
@@ -631,7 +632,7 @@ class _RcfrSolver(object):
   Requires that subclasses implement `evaluate_and_update_policy`.
   """
 
-  def __init__(self, game, models, truncate_negative=False):
+  def __init__(self, game, models, alpha=0.9, truncate_negative=False):
     """Creates a new `_RcfrSolver`.
 
     Args:
@@ -641,10 +642,11 @@ class _RcfrSolver(object):
       truncate_negative: Whether or not to truncate negative (approximate)
         cumulative regrets to zero to implement RCFR+. Defaults to `False`.
     """
+    self.alpha = alpha
     self._game = game
     self._models = models
     self._truncate_negative = truncate_negative
-    self._root_wrapper = RootStateWrapper(game.new_initial_state())
+    self._root_wrapper = RootStateWrapper(game.new_initial_state(), alpha)
 
     self._cumulative_seq_probs = [
         np.zeros(n) for n in self._root_wrapper.num_player_sequences
@@ -729,10 +731,10 @@ class RcfrSolver(_RcfrSolver):
   restrict the user to regression tree models.
   """
 
-  def __init__(self, game, models, bootstrap=None, truncate_negative=False):
+  def __init__(self, game, models, alpha=0.9, bootstrap=None, truncate_negative=False):
     self._bootstrap = bootstrap
     super(RcfrSolver, self).__init__(
-        game, models, truncate_negative=truncate_negative)
+        game, models, alpha, truncate_negative=truncate_negative)
 
     self._regret_targets = [
         np.zeros(n) for n in self._root_wrapper.num_player_sequences
@@ -765,14 +767,17 @@ class RcfrSolver(_RcfrSolver):
       self._cumulative_seq_probs[seq_prob_player] += seq_probs
 
       targets = torch.unsqueeze(
-          torch.Tensor(self._regret_targets[regret_player]), axis=1)
+          torch.Tensor(self._regret_targets[regret_player] + [self.alpha]), axis=1)
       data = torch.utils.data.TensorDataset(player_seq_features[regret_player],
                                             targets)
 
       regret_player_model = self._models[regret_player]
       train_fn(regret_player_model, data)
+      a = 0
+      for d in data: a += d[1][0]
+      a /= len(data)
+      self.alpha = a
       sequence_weights[regret_player] = self._sequence_weights(regret_player)
-      # print(self._regret_targets)
 
 
 class ReservoirBuffer(object):
